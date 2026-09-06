@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyidk"
+version = "0.1.0"
+description = "A small, extensible implementation of Isolation Kernel and Isolation Distributional Kernel."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+authors = [
+  { name = "Dan McGonigle" }
+]
+keywords = [
+  "isolation-kernel",
+  "isolation-kernels",
+  "isolation-distributional-kernel",
+  "isolation-distributional-kernels",
+  "kernel-methods",
+  "trajectory",
+  "similarity",
+  "machine-learning",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "numpy>=2.4",
+  "scipy>=1.17",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.19",
+  "scipy-stubs>=1.17",
+  "pytest>=8.4",
+  "pytest-cov>=6.0",
+  "pytest-html>=4.1",
+  "ruff>=0.12",
+]
+nb = [
+  "matplotlib>=3.10",
+  "jupyterlab>=4.4",
+  "nbclient>=0.10",
+  "nbformat>=5.10",
+  "ipykernel>=6.30",
+]
+
+[project.urls]
+# Fill these in once the repository exists.
+# Homepage = "https://github.com/<owner>/pyidk"
+# Repository = "https://github.com/<owner>/pyidk"
+# Issues = "https://github.com/<owner>/pyidk/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyidk"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-config --strict-markers"
+xfail_strict = true
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+check_untyped_defs = true
