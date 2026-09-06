@@ -1,9 +1,7 @@
 # pyidk
 
 `pyidk` is a small, extensible Python implementation of the **Isolation Kernel (IK)**
-and **Isolation Distributional Kernel (IDK)**.
-
-The first release is intentionally narrow. It provides the pieces needed to experiment
+and **Isolation Distributional Kernel (IDK)**. It provides the pieces needed to experiment
 with IDK on arbitrary numeric feature vectors and variable-length sequential data without
 committing the package to any particular application domain.
 
@@ -11,39 +9,18 @@ committing the package to any particular application domain.
 
 1. **Arbitrary numeric features** — the kernel operates on ordinary `N x d` arrays.
 2. **Temporal representations are separate from the kernel** — states, transitions,
-   windows, and phase augmentation are preprocessing choices, not separate IDK algorithms.
+   windows, and phase augmentation are part of preprocessing.
 3. **Variable-length sequences without padding** — `SequenceBatch` stores concatenated
    observations plus sequence offsets.
 4. **Sparse embeddings** — point and distribution embeddings use SciPy CSR matrices.
 5. **Extensible partition construction** — sampling and partitioning are independent
    abstractions so regional/stratified sampling can be added later.
-6. **Reasonable performance without premature optimization** — NumPy/SciPy vectorization
-   and chunked distance calculations first; compiled/JIT paths can be added only after
-   profiling demonstrates a need.
-7. **Clean-room implementation** — this project is intended to be implemented from
-   published algorithm descriptions and mathematical definitions, not copied from other
-   IDK software implementations.
 
 ## Status
 
-This is an **alpha-quality research implementation**. The API may change.
+This is an **alpha-quality research implementation**. The API will likely change.
 
-Implemented in 0.1.0:
-
-- `SequenceBatch` for variable-length sequences
-- feature standardization and min-max scaling
-- point representations
-- lagged/transition representations
-- fixed-length temporal windows
-- normalized phase augmentation
-- uniform partition sampling
-- iNNE-style hypersphere isolation partitions
-- sparse Isolation Kernel point embeddings
-- sparse Isolation Distributional Kernel group embeddings
-- pairwise kernel similarity
-- mathematical and behavioral unit tests
-
-Deliberately deferred:
+Potential future additions:
 
 - anomaly detectors
 - recovery logic
@@ -61,6 +38,7 @@ Python 3.14 is required.
 
 Runtime installation:
 
+### Via PIP
 ```bash
 pip install .
 ```
@@ -71,191 +49,35 @@ Development installation:
 pip install .[dev]
 ```
 
+Notebook installation:
+
+```bash
+pip install .[nb]
+```
+
+### Via Makefile
+```bash
+make env
+```
+
 Run the tests:
 
 ```bash
 pytest
 ```
 
-## Intuition notebooks
+## Intuition/Exploration notebooks
 
-[Dartboard](notebooks/01_idk_intuition.ipynb) and
-[sinusoids](notebooks/02_idk_sinusoids.ipynb) demonstrate IK, IDK, and temporal
-representations. Each opens with a numbered outline and a Summary of the executed figures.
+- [dartboard](notebooks/01_idk_intuition.ipynb)
+- [sinusoids](notebooks/02_idk_sinusoids.ipynb) 
+- [benchmarking](notebooks/03_idk_benchmarking.ipynb) 
 
 Install notebook dependencies with `pip install -e ".[nb]"`, then run `jupyter lab`
 from the repository root using the same Python environment.
 
 ## Quick start
 
-```python
-import numpy as np
-
-from pyidk import (
-    IsolationDistributionalKernel,
-    IsolationKernel,
-    SequenceBatch,
-    Standardizer,
-    TransitionRepresentation,
-)
-
-demonstrations = SequenceBatch.from_sequences(
-    [
-        np.array([
-            [0.0, 0.0],
-            [0.1, 0.2],
-            [0.2, 0.4],
-            [0.3, 0.5],
-        ]),
-        np.array([
-            [1.0, 1.0],
-            [1.1, 0.9],
-            [1.2, 0.8],
-        ]),
-    ]
-)
-
-# Build a temporal representation: [x_t, x_{t+1}]
-transitions = TransitionRepresentation(lags=(0, 1)).transform(demonstrations)
-
-# Fit scaling only on training data.
-scaler = Standardizer().fit(transitions.values)
-transitions = transitions.with_values(scaler.transform(transitions.values))
-
-point_kernel = IsolationKernel(
-    n_partitions=100,
-    samples_per_partition=3,
-    random_state=42,
-)
-
-idk = IsolationDistributionalKernel(point_kernel)
-idk.fit(transitions)
-
-# One sparse row per demonstration.
-group_embeddings = idk.transform(transitions)
-
-# Distributional similarity matrix.
-similarities = idk.similarity(group_embeddings)
-```
-
-## SequenceBatch
-
-Real trajectories usually have different lengths. Instead of padding them to a common
-length, `SequenceBatch` stores all observations contiguously:
-
-```text
-values =
-    sequence 0 rows
-    sequence 1 rows
-    sequence 2 rows
-    ...
-
-offsets = [0, end_of_seq_0, end_of_seq_1, end_of_seq_2, ...]
-```
-
-For sequence lengths `[4, 3, 5]`:
-
-```python
-offsets == [0, 4, 7, 12]
-```
-
-This representation is compact and ensures temporal transforms never cross sequence
-boundaries.
-
-## Representations
-
-Temporal structure is intentionally modeled *before* the kernel.
-
-### Points
-
-```python
-PointRepresentation()
-```
-
-produces:
-
-```text
-x_t
-```
-
-### Transitions / arbitrary lags
-
-```python
-TransitionRepresentation(lags=(0, 1))
-```
-
-produces:
-
-```text
-[x_t, x_{t+1}]
-```
-
-while:
-
-```python
-TransitionRepresentation(lags=(0, 2))
-```
-
-produces:
-
-```text
-[x_t, x_{t+2}]
-```
-
-and:
-
-```python
-TransitionRepresentation(lags=(0, 1, 2))
-```
-
-produces:
-
-```text
-[x_t, x_{t+1}, x_{t+2}]
-```
-
-### Windows
-
-```python
-WindowRepresentation(length=8, stride=1)
-```
-
-flattens each eight-step window into one feature vector.
-
-### Phase
-
-```python
-PhaseAugmentation()
-```
-
-appends normalized sequence phase in `[0, 1]` to every observation.
-
-Representations can be composed explicitly. For example, augment observations with phase
-and then construct transitions.
-
-## Feature scaling
-
-The default Euclidean geometry is sensitive to feature scale. Position measured in meters,
-force measured in newtons, and actions measured in unrelated units should not be expected
-to contribute equally without preprocessing.
-
-The package includes two intentionally simple scalers:
-
-```python
-Standardizer()
-MinMaxScaler()
-```
-
-`Standardizer` computes:
-
-```text
-x' = (x - mean) / standard_deviation
-```
-
-and is the recommended baseline.
-
-Scaling is a research decision, not an IDK requirement. More sophisticated modality
-weighting can be added later without changing the kernel.
+See `examples/basic_usage.py`
 
 ## Isolation Kernel implementation
 
@@ -303,8 +125,7 @@ Likely post-0.1 additions:
 - modality-specific distance composition
 - optimized direct group aggregation
 - optional JIT acceleration based on profiling
-- anomaly/failure-detection utilities once research experiments establish which interfaces
-  are actually useful
+- anomaly/failure-detection utilities once research experiments establish which interfaces are actually useful
 
 ## References
 
