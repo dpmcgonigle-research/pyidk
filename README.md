@@ -34,7 +34,7 @@ Potential future additions:
 
 ## Installation
 
-Python 3.14 is required.
+Python 3.11 or newer is required.
 
 Runtime installation:
 

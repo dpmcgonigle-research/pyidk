@@ -3,11 +3,10 @@
 import numpy as np
 from numpy.typing import NDArray
 
-type FloatArray = NDArray[np.float64]
-type TrajectoryGroups = dict[str, list[FloatArray]]
+TrajectoryGroups = dict[str, list[NDArray[np.float64]]]
 
 
-def smoothstep(u: FloatArray) -> FloatArray:
+def smoothstep(u: NDArray[np.float64]) -> NDArray[np.float64]:
     """Turn progression values into a smooth ramp from zero to one."""
     u = np.clip(u, 0.0, 1.0)
     return u * u * (3.0 - 2.0 * u)
@@ -16,7 +15,11 @@ def smoothstep(u: FloatArray) -> FloatArray:
 def dart_throws(
     seed: int = 42, n: int = 121
 ) -> tuple[
-    FloatArray, list[FloatArray], list[FloatArray], TrajectoryGroups, dict[str, float | None]
+    NDArray[np.float64],
+    list[NDArray[np.float64]],
+    list[NDArray[np.float64]],
+    TrajectoryGroups,
+    dict[str, float | None],
 ]:
     """Independent train/calibration/test throws and matched counterfactual paths.
 
@@ -30,7 +33,7 @@ def dart_throws(
     rng = np.random.default_rng(seed)
     u = np.linspace(0, 1, n)
 
-    def nominal() -> FloatArray:
+    def nominal() -> NDArray[np.float64]:
         """Generate one successful throw as an (n, 2) coordinate array."""
         control_points = np.array([[-5.0, -1.2], [-3.9, 1.4], [-1.7, 1.0], [0.0, 0.0]])
         control_points += rng.normal(0, [0.07, 0.09], control_points.shape)
@@ -69,10 +72,10 @@ def dart_throws(
 def sine_trajectories(
     seed: int = 43, n: int = 181
 ) -> tuple[
-    FloatArray,
-    list[FloatArray],
-    list[FloatArray],
-    list[FloatArray],
+    NDArray[np.float64],
+    list[NDArray[np.float64]],
+    list[NDArray[np.float64]],
+    list[NDArray[np.float64]],
     TrajectoryGroups,
     dict[str, float],
 ]:
@@ -85,7 +88,7 @@ def sine_trajectories(
     u = np.linspace(0, 1, n)
     x = 6 * np.pi * u
 
-    def nominal() -> FloatArray:
+    def nominal() -> NDArray[np.float64]:
         """Generate one slightly varied sine path as an (n, 2) array."""
         amplitude = rng.normal(1, 0.025)
         phase = rng.normal(0, 0.035)
@@ -117,7 +120,7 @@ def sine_trajectories(
     return u, train, calibration, nominal_test, groups, onsets
 
 
-def sampling_pair(n: int = 361) -> tuple[FloatArray, FloatArray]:
+def sampling_pair(n: int = 361) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Return uniform and dwell-weighted samples of the same curve, each shape (n, 2)."""
     u = np.linspace(0, 1, n)
     grid = np.linspace(0, 1, 10001)
@@ -126,7 +129,7 @@ def sampling_pair(n: int = 361) -> tuple[FloatArray, FloatArray]:
     cumulative = (cumulative - cumulative[0]) / (cumulative[-1] - cumulative[0])
     dwell_u = np.interp(u, cumulative, grid)
 
-    def path(progression: FloatArray) -> FloatArray:
+    def path(progression: NDArray[np.float64]) -> NDArray[np.float64]:
         """Convert normalized progression values into x and y coordinates."""
         x = 6 * np.pi * progression
         return np.column_stack((x, np.sin(x)))
