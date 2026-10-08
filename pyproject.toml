@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyidk"
-version = "0.1.2"
+version = "0.2.0"
 description = "A small, extensible implementation of Isolation Kernel and Isolation Distributional Kernel."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -66,6 +66,7 @@ packages = ["src/pyidk"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = "-ra --strict-config --strict-markers"
 xfail_strict = true
 

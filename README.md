@@ -79,6 +79,10 @@ from the repository root using the same Python environment.
 
 See `examples/basic_usage.py`
 
+For cached moving-window similarity, distance, outside mass, and reference
+reductions, see the [windowed analytics API guide](docs/windowed_analytics.md)
+and [runnable example](examples/windowed_analytics.py).
+
 ## Isolation Kernel implementation
 
 For each of `t` independent partitions:
