@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project intends to follow semantic versioning once the public API stabilizes.
 
+## [0.2.1] - Unreleased
+
+### Added
+
+- Public cosine similarity, partition-averaged Jensen–Shannon divergence, and
+  smoothed directional Kullback–Leibler divergence for sparse embeddings.
+- `cosine`, `js`, and `kl` metrics in blockwise mean/top-K reference reductions,
+  with explicit `metric_parameters` for KL epsilon and JS/KL occupancy tolerance.
+- Shared occupancy validation including outside probability, bounded partition
+  and category workspaces, and stable handling of zero/near-identical vectors.
+- Independent numerical tests, cartpole-idk fixture parity checks, and an updated
+  guide and runnable example demonstrating all five metrics and migration.
+
 ## [0.2.0] - Unreleased
 
 ### Added

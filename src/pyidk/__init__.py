@@ -1,5 +1,6 @@
 """Isolation Kernel and Isolation Distributional Kernel."""
 
+from .comparison import pairwise_cosine, pairwise_js_divergence, pairwise_kl_divergence
 from .data import SequenceBatch
 from .distribution import IsolationDistributionalKernel
 from .kernel import IsolationKernel
@@ -31,8 +32,11 @@ __all__ = [
     "WindowEmbeddings",
     "outside_mass",
     "pairwise_distance",
+    "pairwise_cosine",
+    "pairwise_js_divergence",
+    "pairwise_kl_divergence",
     "pairwise_similarity",
     "reduce_references",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

@@ -82,12 +82,13 @@ def main() -> None:
                 ):
                     return query_sources[q, None] != reference_sources[None, r]
 
-                for metric in ("similarity", "distance"):
+                for metric in ("similarity", "distance", "cosine", "js", "kl"):
                     for aggregation in ("mean", "top_k"):
                         result = reduce_references(
                             query,
                             references,
                             metric=metric,
+                            metric_parameters={"epsilon": 0.01} if metric == "kl" else None,
                             aggregation=aggregation,
                             k=5 if aggregation == "top_k" else None,
                             eligibility=eligible,
@@ -122,6 +123,10 @@ def main() -> None:
             # Outside-mass IQR also uses one mean-support score per trajectory.
             for metric, aggregation in [
                 ("similarity", "top_k"),
+                ("distance", "top_k"),
+                ("cosine", "top_k"),
+                ("js", "top_k"),
+                ("kl", "top_k"),
                 ("outside_mass", "partition_mean"),
             ]:
                 selected = [

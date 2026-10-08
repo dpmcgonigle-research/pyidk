@@ -57,10 +57,14 @@ def pairwise_similarity(
     if embeddings.shape[1] != other.shape[1]:
         raise ValueError("Embedding matrices must have the same number of columns.")
 
-    result = (embeddings @ other.T) / float(n_partitions)
+    result = _similarity_block(embeddings, other, n_partitions)
     if dense:
         return np.asarray(result.toarray())
     return result.tocsr()
+
+
+def _similarity_block(left: csr_matrix, right: csr_matrix, n_partitions: int) -> csr_matrix:
+    return (left @ right.T) / float(n_partitions)
 
 
 def pairwise_distance(

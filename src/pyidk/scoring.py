@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -10,10 +10,9 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.sparse import csr_matrix
 
-from .similarity import _distance_block, _validate_embeddings
+from .comparison import Metric, _MetricEvaluator
 from .windows import WindowEmbeddings, _positive_integer
 
-Metric = Literal["similarity", "distance"]
 Reduction = Literal["mean", "top_k"]
 Eligibility = (
     NDArray[np.bool_] | Callable[[NDArray[np.int64], NDArray[np.int64]], NDArray[np.bool_]]
@@ -63,6 +62,7 @@ def reduce_references(
     *,
     n_partitions: int | None = None,
     metric: Metric = "similarity",
+    metric_parameters: Mapping[str, float] | None = None,
     aggregation: Reduction = "mean",
     k: int | None = None,
     eligibility: Eligibility | None = None,
@@ -75,9 +75,14 @@ def reduce_references(
     Pass two ``WindowEmbeddings`` for automatic basis and interval validation,
     or two sparse matrices plus ``n_partitions`` (basis identity is then the
     caller's responsibility). ``mean`` uses all eligible references. ``top_k``
-    requires positive ``k`` and selects highest similarities or lowest distances
-    independently, using fewer than k when necessary. No implicit alignment or
+    requires positive ``k`` and selects highest similarity/cosine or lowest
+    distance/JS/KL, using fewer than k when necessary. No implicit alignment or
     weighting by source sequence is applied.
+
+    ``metric_parameters={'epsilon': value}`` is required for KL. JS/KL also accept
+    ``atol`` (default 1e-12) for mean-occupancy validation. Other metrics accept
+    no parameters. Unknown/missing/invalid parameters are rejected even on empty
+    inputs. JS is divergence in nats; KL is smoothed query-to-reference divergence.
 
     ``eligibility`` is either a full boolean (n_query, n_reference) mask or a
     callback receiving global query/reference index vectors and returning a
@@ -85,14 +90,16 @@ def reduce_references(
     source identity/exclusion policy there, before neighbor selection.
 
     Working pairwise memory is O(query_block_size * reference_block_size), plus
-    O(query_block_size * k) for top-K. Output scores/counts are O(n_query).
+    O(query_block_size * k) for top-K. JS/KL additionally hold one partition's
+    categories for each row block, O((query_block_size+reference_block_size)*psi),
+    and process categories individually, never a pair-by-feature tensor.
+    Preparation may copy sparse inputs; it never densifies all feature rows.
+    Output scores/counts are O(n_query).
     Optional selections cost O(n_query*k) for top-K or O(number of eligible
     pairs) for means; request them only when inspection warrants that memory.
     For fully streamed queries, call this on batches from ``iter_windows``.
     Callbacks must depend on indices, not on block size or invocation history.
     """
-    if metric not in ("similarity", "distance"):
-        raise ValueError("metric must be 'similarity' or 'distance'.")
     if aggregation not in ("mean", "top_k"):
         raise ValueError("aggregation must be 'mean' or 'top_k'.")
     if aggregation == "top_k":
@@ -117,10 +124,8 @@ def reduce_references(
         query, reference = query.embeddings, reference.embeddings
     if n_partitions is None:
         raise ValueError("Raw sparse matrices require n_partitions.")
-    left = _validate_embeddings(query, n_partitions)
-    right = _validate_embeddings(reference, n_partitions)
-    if left.shape[1] != right.shape[1]:
-        raise ValueError("Embedding matrices must have the same number of columns.")
+    evaluator = _MetricEvaluator(query, reference, n_partitions, metric, metric_parameters)
+    left, right = evaluator.left, evaluator.right
     nq, nr = left.shape[0], right.shape[0]
     if eligibility is not None and not callable(eligibility):
         eligibility = np.asarray(eligibility)
@@ -131,12 +136,9 @@ def reduce_references(
     selected_counts = np.zeros(nq, dtype=np.int64)
     inspected_indices: list[NDArray[np.int64]] = []
     inspected_values: list[NDArray[np.float64]] = []
-    left_norm = np.asarray(left.multiply(left).sum(axis=1)).ravel() / n_partitions
-    right_norm = np.asarray(right.multiply(right).sum(axis=1)).ravel() / n_partitions
     for qa in range(0, nq, query_block_size):
         qb = min(qa + query_block_size, nq)
         q_indices = np.arange(qa, qb, dtype=np.int64)
-        q_rows = left[qa:qb]
         total = np.zeros(qb - qa)
         correction = np.zeros(qb - qa)
         best_indices = [np.empty(0, dtype=np.int64) for _ in q_indices]
@@ -146,13 +148,7 @@ def reduce_references(
         for ra in range(0, nr, reference_block_size):
             rb = min(ra + reference_block_size, nr)
             r_indices = np.arange(ra, rb, dtype=np.int64)
-            if metric == "similarity":
-                block = (q_rows @ right[ra:rb].T).toarray()
-                block *= 1.0 / n_partitions
-            else:
-                block = _distance_block(
-                    q_rows, right[ra:rb], n_partitions, left_norm[qa:qb], right_norm[ra:rb]
-                )
+            block = evaluator.block(qa, qb, ra, rb)
             if eligibility is None:
                 allowed = np.ones(block.shape, dtype=bool)
             elif callable(eligibility):
@@ -180,7 +176,7 @@ def reduce_references(
                 for i in range(qb - qa):
                     indices = np.concatenate((best_indices[i], r_indices[allowed[i]]))
                     values = np.concatenate((best_values[i], block[i, allowed[i]]))
-                    ranks = -values if metric == "similarity" else values
+                    ranks = -values if evaluator.higher_is_better else values
                     order = np.lexsort((indices, ranks))[:k]
                     indices, values = indices[order], values[order]
                     best_indices[i], best_values[i] = indices, values
